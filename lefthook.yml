@@ -18,4 +18,5 @@ pre-push:
       run: pnpm typecheck
 
     - name: test
-      run: pnpm test
+      # TODO: quitar --filter cuando packages/simulator-engine tenga código y tests propios
+      run: pnpm turbo run test --filter=@network-lab/core
