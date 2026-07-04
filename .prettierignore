@@ -1,6 +1,7 @@
 node_modules
 .next
-dist
 .turbo
-*.log
+dist
+pnpm-lock.yaml
+labs
 coverage

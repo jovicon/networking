@@ -6,10 +6,13 @@
   "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }

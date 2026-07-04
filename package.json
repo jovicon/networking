@@ -7,7 +7,13 @@
     "dev": "turbo run dev --filter=web",
     "build": "turbo run build",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build && changeset publish"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +27,12 @@
   },
   "type": "module",
   "devDependencies": {
-    "turbo": "^2.10.3"
+    "@changesets/cli": "^2.31.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "lefthook": "^2.1.9",
+    "prettier": "^3.9.4",
+    "turbo": "^2.10.3",
+    "typescript-eslint": "^8.62.1"
   }
 }
