@@ -23,11 +23,11 @@ describe('Packet', () => {
     expect(packet.payload).toBe('');
   });
 
-  it('asigna un id incremental único a cada packet', () => {
+  it('asigna un id único a cada packet', () => {
     const p1 = new Packet({ sourceMac: 'aa:aa:aa:aa:aa:aa', destMac: 'bb:bb:bb:bb:bb:bb' });
     const p2 = new Packet({ sourceMac: 'aa:aa:aa:aa:aa:aa', destMac: 'bb:bb:bb:bb:bb:bb' });
 
-    expect(p2.id).toBeGreaterThan(p1.id);
+    expect(p2.id).not.toBe(p1.id);
   });
 
   it('lanza error si falta sourceMac', () => {

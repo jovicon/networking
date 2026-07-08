@@ -1,5 +1,3 @@
-let sequence = 0;
-
 export interface PacketOptions {
   sourceMac: string;
   destMac: string;
@@ -13,7 +11,7 @@ export interface PacketOptions {
 export class Packet {
   static readonly BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff';
 
-  readonly id: number;
+  readonly id: string;
   readonly sourceMac: string;
   readonly destMac: string;
   readonly payload: string;
@@ -26,7 +24,7 @@ export class Packet {
       throw new Error('Packet requiere destMac');
     }
 
-    this.id = ++sequence;
+    this.id = crypto.randomUUID();
     this.sourceMac = options.sourceMac;
     this.destMac = options.destMac;
     this.payload = options.payload ?? '';
