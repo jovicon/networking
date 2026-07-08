@@ -67,9 +67,9 @@ Si aparece `ERR_PNPM_IGNORED_BUILDS`, la solución es `pnpm approve-builds` (int
 
 ## Estado actual del código (actualizado 2026-07-08)
 
-El scaffold del monorepo está listo (pnpm workspaces + Turborepo + Next.js). `packages/core` tiene implementadas y testeadas las 3 clases base de Fase 1 paso 1: `Packet`, `Device`, `Link`, con tests en Vitest. `Device`/`Link` ya son multi-puerto (Fase 1, paso 1.0, completado). `Switch` v1 (flooding puro, Fase 1 paso 2) también está completo. `simulator-engine` sigue vacío (`export {}`) — el mecanismo de tiempo simulado se diseña en el paso 3.5 de Fase 1, antes de que MAC aging lo necesite.
+El scaffold del monorepo está listo (pnpm workspaces + Turborepo + Next.js). `packages/core` tiene implementadas y testeadas las 3 clases base de Fase 1 paso 1: `Packet`, `Device`, `Link`, con tests en Vitest. `Device`/`Link` ya son multi-puerto (Fase 1, paso 1.0, completado). `Switch` v1 (flooding puro, Fase 1 paso 2) también está completo. `simulator-engine` ya tiene `SimulatedClock` (Fase 1, paso 3.5, completado) — reloj lógico con `now()`/`advance()`/`scheduleAt()`, listo para inyectarse donde se necesite tiempo determinístico.
 
-**Próximo paso concreto: Fase 1, paso 3 — Switch v2 (MAC learning + aging).**
+**Próximo paso concreto: Fase 1, paso 3 — Switch v2 (MAC learning + aging), usando `SimulatedClock` para el TTL de 300s.**
 
 ## Tooling de calidad (lint, format, git hooks, versionado)
 
@@ -81,7 +81,7 @@ El scaffold del monorepo está listo (pnpm workspaces + Turborepo + Next.js). `p
 
 ## Roadmap de desarrollo (sincronizado con CCNA 200-301)
 
-El plan completo son 16 semanas, dividido en fases. Progreso actual: **Fase 1, paso 2 completo** (Switch v1, flooding puro). Siguiente paso: **Fase 1, paso 3 (Switch v2 — MAC learning + aging)**.
+El plan completo son 16 semanas, dividido en fases. Progreso actual: **Fase 1, paso 3.5 completo** (SimulatedClock). Siguiente paso: **Fase 1, paso 3 (Switch v2 — MAC learning + aging)**, ya con el reloj simulado disponible.
 
 Convención de esta sección: cada paso lista (a) qué archivo(s) se crean/modifican, (b) qué comportamiento de red concreto demuestra, (c) qué test lo prueba. Objetivo: cualquier paso se puede tomar de forma aislada sin tener que re-derivar decisiones de diseño.
 
@@ -117,12 +117,24 @@ Dominio CCNA 2.0 (Network Access).
 - Ejemplo: primer frame `pc1→pc2` floodea (MAC de pc2 desconocida); frame `pc2→pc1` enseña la MAC de pc2; **el tercer frame `pc1→pc2` ya usa unicast** (no floodea a pc3).
 - Tests: `'aprende la MAC origen y el puerto de entrada en cada frame'`, `'el tercer frame entre los mismos hosts ya usa unicast en vez de flood'`, `'una entrada expira a los 300s de inactividad y vuelve a floodear'`.
 
-**Paso 3.5 — Tiempo simulado (`SimulatedClock` en `simulator-engine`) — prerequisito de aging, STP timers, y RIP holddown de Fase 2.**
+**Paso 3.5 — Tiempo simulado (`SimulatedClock` en `simulator-engine`) — prerequisito de aging, STP timers, y RIP holddown de Fase 2 (✅ completo).**
 
 - Archivos: `packages/simulator-engine/src/clock/SimulatedClock.ts`, `SimulatedClock.test.ts`.
 - Diseño: reloj lógico propio (no `Date.now()` real — determinismo total), `advance(ms)` avanza el tiempo y ejecuta callbacks con `deadline <= now`, `now()`, `scheduleAt(deadline, callback)`. `core` recibe un reloj inyectado (interfaz `Clock` con solo `now()`) para no acoplar `core` a `simulator-engine` — `core` permanece dominio puro.
 - Comportamiento: todo temporizador de red real (MAC aging, STP hello/forward-delay, RIP timers, TCP retransmit) es "si pasa X tiempo sin evento Y, hacer Z" — este es el motor genérico detrás de esa lógica.
 - Tests: `'advance() ejecuta un callback programado cuando el tiempo llega a su deadline'`, `'advance() no ejecuta callbacks cuyo deadline aún no llegó'`.
+
+**Paso 3.6 — EventBus mínimo (`simulator-engine`) — prerequisito de la UI.**
+
+- Archivos: `packages/simulator-engine/src/events/EventBus.ts` (+ test), tipos de evento (`PacketSentEvent`, `PacketReceivedEvent`, `MacLearnedEvent`, `MacExpiredEvent`).
+- Comportamiento: capa fina que traduce las llamadas de `Device`/`Switch`/`SimulatedClock` en eventos observables (`on(eventType, handler)` / `emit(eventType, payload)`) — no agrega comportamiento de red nuevo, solo hace observable lo que ya existe en `core`. `simulator-engine` orquesta: crea las instancias de `Device`/`Switch` con el `SimulatedClock` inyectado, y emite un evento cada vez que algo relevante pasa.
+- Tests: `'emite packetSent cuando un Device envía un packet'`, `'emite packetReceived cuando un Device recibe un packet'`, `'emite macLearned cuando un Switch aprende una MAC nueva'`.
+
+**Paso 3.7 — Inicio del simulador visual (`apps/web`).**
+
+- Archivos: instala React Flow + Zustand (ya en el stack técnico, sin usar todavía); `apps/web/features/topology-editor/` (canvas con nodos=Device/Switch, edges=Link, arquitectura Screaming/Feature-Sliced ya definida), `apps/web/features/packet-simulation/` (se suscribe al EventBus del paso 3.6, anima el paquete viajando por el Link correspondiente).
+- Comportamiento: primera versión visual del proyecto — topología estática renderizada + animación en vivo del escenario ya construido en el paso 3 (frame 1 floodea visualmente a todos los puertos, frame 3 va directo por unicast). Se elige este punto y no antes porque es el primer momento donde hay algo genuinamente dinámico que mostrar (flood→unicast); antes de esto la UI solo tendría cajas estáticas sin comportamiento que anime.
+- Verificación: manual, no Vitest — correr `pnpm --filter web dev`, armar la topología del paso 3 (1 switch + 3 PCs) en el canvas, disparar el escenario y confirmar visualmente el cambio de flood a unicast tras el tercer frame.
 
 **Paso 4 — VLANs (802.1Q, access/trunk).**
 
