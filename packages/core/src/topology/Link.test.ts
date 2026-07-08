@@ -10,8 +10,18 @@ describe('Link', () => {
 
     const link = new Link(pc1, pc2);
 
-    expect(link.getOtherEnd(pc1)).toBe(pc2);
-    expect(link.getOtherEnd(pc2)).toBe(pc1);
+    expect(link.getOtherEnd(pc1).device).toBe(pc2);
+    expect(link.getOtherEnd(pc2).device).toBe(pc1);
+  });
+
+  it('conecta cada device a un portId propio e independiente', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+
+    new Link(pc1, pc2, 'eth0', 'eth5');
+
+    expect(pc1.getPort('eth0')).toBeDefined();
+    expect(pc2.getPort('eth5')).toBeDefined();
   });
 
   it('lanza error si se intenta conectar un device consigo mismo', () => {

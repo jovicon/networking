@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Device } from './Device';
 import { Link } from '../topology/Link';
 import { Packet } from '../packet/Packet';
@@ -43,13 +43,35 @@ describe('Device', () => {
     expect(pc2.isConnected()).toBe(true);
   });
 
-  it('lanza error al conectar un segundo link al mismo device', () => {
+  it('permite conectar un segundo link en un puerto distinto', () => {
     const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
     const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
     const pc3 = new Device({ id: 'pc3', mac: 'cc:cc:cc:cc:cc:cc' });
     new Link(pc1, pc2);
+    new Link(pc1, pc3);
 
-    expect(() => new Link(pc1, pc3)).toThrowError('Device pc1 ya tiene un link conectado');
+    expect(pc1.getConnectedPorts()).toHaveLength(2);
+  });
+
+  it('lanza error si se fuerza el mismo portId dos veces', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+    const pc3 = new Device({ id: 'pc3', mac: 'cc:cc:cc:cc:cc:cc' });
+    new Link(pc1, pc2, 'port0');
+
+    expect(() => new Link(pc1, pc3, 'port0')).toThrowError(
+      'Device pc1 ya tiene un link conectado en el puerto port0',
+    );
+  });
+
+  it('autoasigna portId incremental si no se especifica', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+    const pc3 = new Device({ id: 'pc3', mac: 'cc:cc:cc:cc:cc:cc' });
+    new Link(pc1, pc2);
+    new Link(pc1, pc3);
+
+    expect(pc1.getConnectedPorts().map((p) => p.id)).toEqual(['port0', 'port1']);
   });
 
   it('send() lanza error si el device no tiene link conectado', () => {
@@ -69,6 +91,45 @@ describe('Device', () => {
 
     expect(pc2.getReceivedPackets()).toEqual([packet]);
     expect(pc1.getReceivedPackets()).toEqual([]);
+  });
+
+  it('send() lanza error si el device tiene múltiples puertos conectados', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+    const pc3 = new Device({ id: 'pc3', mac: 'cc:cc:cc:cc:cc:cc' });
+    new Link(pc1, pc2);
+    new Link(pc1, pc3);
+    const packet = new Packet({ sourceMac: pc1.mac, destMac: pc2.mac });
+
+    expect(() => pc1.send(packet)).toThrowError(
+      'Device pc1 tiene múltiples puertos conectados; usar sendFrom(packet, portId)',
+    );
+  });
+
+  it('sendFrom() entrega el packet por el puerto especificado sin afectar otros puertos', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+    const pc3 = new Device({ id: 'pc3', mac: 'cc:cc:cc:cc:cc:cc' });
+    new Link(pc1, pc2, 'port0');
+    new Link(pc1, pc3, 'port1');
+    const packet = new Packet({ sourceMac: pc1.mac, destMac: pc2.mac });
+
+    pc1.sendFrom(packet, 'port0');
+
+    expect(pc2.getReceivedPackets()).toEqual([packet]);
+    expect(pc3.getReceivedPackets()).toEqual([]);
+  });
+
+  it('receive() recibe el portId de entrada (usado por subclases como Switch)', () => {
+    const pc1 = new Device({ id: 'pc1', mac: 'aa:aa:aa:aa:aa:aa' });
+    const pc2 = new Device({ id: 'pc2', mac: 'bb:bb:bb:bb:bb:bb' });
+    new Link(pc1, pc2, 'port0', 'portX');
+    const packet = new Packet({ sourceMac: pc1.mac, destMac: pc2.mac });
+    const receiveSpy = vi.spyOn(pc2, 'receive');
+
+    pc1.send(packet);
+
+    expect(receiveSpy).toHaveBeenCalledWith(packet, 'portX');
   });
 
   it('receive() acepta un packet broadcast aunque la destMac no coincida', () => {

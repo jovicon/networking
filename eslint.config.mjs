@@ -17,6 +17,10 @@ export default defineConfig([
   {
     files: ['packages/**/*.ts'],
     rules: {
+      // permite parámetros con prefijo _ para firmas de método pensadas para
+      // ser sobreescritas (ej. Device.receive(packet, _inPortId) — la base
+      // no lo usa, Switch sí lo necesita en su override)
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       // packages/core es dominio puro: nunca debe importar de apps/* ni frameworks de UI
       'no-restricted-imports': [
         'error',
